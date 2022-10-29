@@ -9,9 +9,9 @@ import {
   Popconfirm,
   Space,
 } from "antd";
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { db } from "../firebase-config";
-import { collection, addDoc, updateDoc } from "firebase/firestore";
+import { collection, addDoc } from "firebase/firestore";
 import SelectExerciseAndRole from "./SelectExerciseAndRole";
 
 const NewRole = (props) => {
@@ -38,43 +38,47 @@ const NewRole = (props) => {
   // After all fields are filled, the form will be sent to custom validation
   // If it is valid- add new data to DB
   const onFinish = async (values) => {
-    if (selectedExercise == null) {
-      values["exerciseId"] = lastExerciseIdInput;
-      setExerciseInputEmpty(true);
-    } else {
-      values["exerciseId"] = selectedExercise;
-      setLastExerciseIdInput(selectedExercise);
-      setExerciseInputEmpty(false);
-    }
+    try {
+      if (selectedExercise == null) {
+        values["exerciseId"] = lastExerciseIdInput;
+        setExerciseInputEmpty(true);
+      } else {
+        values["exerciseId"] = selectedExercise;
+        setLastExerciseIdInput(selectedExercise);
+        setExerciseInputEmpty(false);
+      }
 
-    if (selectedRole == null) {
-      values["roleId"] = lastRoleIdInput;
-      setRoleInputEmpty(true);
-    } else {
-      values["roleId"] = selectedRole;
-      setLastRoleIdInput(selectedRole);
-      setRoleInputEmpty(false);
-    }
+      if (selectedRole == null) {
+        values["roleId"] = lastRoleIdInput;
+        setRoleInputEmpty(true);
+      } else {
+        values["roleId"] = selectedRole;
+        setLastRoleIdInput(selectedRole);
+        setRoleInputEmpty(false);
+      }
 
-    // After all fields are filled, the form will be sent to custom validation
-    // If it is valid- add new data to DB
-    let isFormValid = customValidation(values);
-    if (isFormValid) {
-      //add row to DB!
-      let newUser = {
-        userId: values.userId,
-        exerciseId: values.exerciseId,
-        roleId: values.roleId,
-        userName: values.userName,
-        password: values.password,
-        canDebrief: values.canDebrief.toLowerCase() == "כן" ? true : false,
-        dsPublishName: values.dsPublishName,
-        didDelete: false,
-      };
+      // After all fields are filled, the form will be sent to custom validation
+      // If it is valid- add new data to DB
+      let isFormValid = customValidation(values);
+      if (isFormValid) {
+        //add row to DB!
+        let newUser = {
+          userId: values.userId,
+          exerciseId: values.exerciseId,
+          roleId: values.roleId,
+          userName: values.userName,
+          password: values.password,
+          canDebrief: values.canDebrief.toLowerCase() == "כן" ? true : false,
+          dsPublishName: values.dsPublishName,
+          didDelete: false,
+        };
 
-      await addDoc(dataCollectionRef, newUser);
-      props.formIsDone();
-      props.dataChanged();
+        await addDoc(dataCollectionRef, newUser);
+        props.formIsDone();
+        props.dataChanged();
+      }
+    } catch (error) {
+      console.log("error", error);
     }
   };
 
@@ -121,7 +125,7 @@ const NewRole = (props) => {
       setExerciseIdInvalid(false);
     }
 
-    // If the form is valid- check if the user is not already assigned to same role in this exercise 
+    // If the form is valid- check if the user is not already assigned to same role in this exercise
     // If he is- form isn't valid
     if (isValid) {
       if (checkIfRoleExerciseAlreadyExists(row)) {
@@ -164,7 +168,7 @@ const NewRole = (props) => {
         onFinish={onFinish}
         onFinishFailed={onFinishFailed}
         autoComplete="off"
-        data-testid="createNewUserForm" 
+        data-testid="createNewUserForm"
       >
         <Input.Group>
           <Row>
@@ -237,7 +241,6 @@ const NewRole = (props) => {
               )}
             </Col>
           </Row>
-
           <Row>
             <Col span={7}>
               <Form.Item
@@ -322,9 +325,9 @@ const NewRole = (props) => {
               title="שים לב, הנתונים יימחקו"
               onConfirm={() => closeForm()}
             >
-              <Button type="primary"
-              data-testid="closeNewUserFormButton"
-              >סגירה</Button>
+              <Button type="primary" data-testid="closeNewUserFormButton">
+                סגירה
+              </Button>
             </Popconfirm>
           </Space>
         </Input.Group>

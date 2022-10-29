@@ -5,12 +5,13 @@ import UserDataDT from "./UserDataDT";
 import RoleDataDT from "./RoleDataDT";
 
 const TrainingTabs = () => {
+  // In any case of data change in roles/exercises (added or removed row)
+  // We would like to reload data in users details dt, because add/edit may be based on new data
   const [didDataChanged, setDidDataChanged] = useState(false);
 
   return (
-    <div class="container">
+    <div>
       <PageHeader
-        className="site-page-header"
         title="הגדרות מתקדמות"
         style={{ backgroundColor: "#ECECEC" }}
       />

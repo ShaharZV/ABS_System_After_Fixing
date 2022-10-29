@@ -1,15 +1,7 @@
 import { Button, Form, Input, Row, Col, Card, Popconfirm, Space } from "antd";
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { db } from "../firebase-config";
-import {
-  collection,
-  getDocs,
-  addDoc,
-  Timestamp,
-  deleteDoc,
-  doc,
-  updateDoc,
-} from "firebase/firestore";
+import { collection, addDoc } from "firebase/firestore";
 
 const NewRole = (props) => {
   const [commonCommandsInvalid, setCommonCommandsInvalid] = useState(false);
@@ -23,26 +15,32 @@ const NewRole = (props) => {
 
   const [form] = Form.useForm();
 
+  const placeHolderForArrayInput = "x,y,z...";
+
   // After all fields are filled, the form will be sent to custom validation
   // If it is valid- add new data to DB
   const onFinish = async (values) => {
-    let isFormValid = customValidation(values);
-    if (isFormValid) {
-      //add row to DB!
-      let newRole = {
-        type: parseInt(values.type),
-        mkrcRole: parseInt(values.mkrcRole),
-        commonCommands: values.commonCommands,
-        allCommands: values.allCommands,
-        blockedCommands: values.blockedCommands,
-        commonReports: values.commonReports,
-        allReports: values.allReports,
-        blockedReports: values.blockedReports,
-        didDelete: false,
-      };
-      await addDoc(dataCollectionRef, newRole);
-      props.formIsDone();
-      props.dataChanged();
+    try {
+      let isFormValid = customValidation(values);
+      if (isFormValid) {
+        //add row to DB!
+        let newRole = {
+          type: parseInt(values.type),
+          mkrcRole: parseInt(values.mkrcRole),
+          commonCommands: values.commonCommands.replace(" ", "").split(","),
+          allCommands: values.allCommands.replace(" ", "").split(","),
+          blockedCommands: values.blockedCommands.replace(" ", "").split(","),
+          commonReports: values.commonReports.replace(" ", "").split(","),
+          allReports: values.allReports.replace(" ", "").split(","),
+          blockedReports: values.blockedReports.replace(" ", "").split(","),
+          didDelete: false,
+        };
+        await addDoc(dataCollectionRef, newRole);
+        props.formIsDone();
+        props.dataChanged();
+      }
+    } catch (error) {
+      console.log("error", error);
     }
   };
 
@@ -58,104 +56,108 @@ const NewRole = (props) => {
 
   // Custom validation to fields, form will arrive to this check only after it's fully filled
   const customValidation = (row) => {
-    let isValid = true;
-    //validate commonCommands input
-    if (row.commonCommands.length == 0) {
-      isValid = false;
-      setCommonCommandsInvalid(true);
-    } else {
-      if (
-        // This regex will return null if the input is not in format of (int, int , int)
-        row.commonCommands.match(/^\((\d+[,]{0,1})*[\)]{0,1}$/) == null ||
-        row.commonCommands == "()"
-      ) {
+    try {
+      let isValid = true;
+      //validate commonCommands input
+      if (row.commonCommands.length == 0) {
         isValid = false;
         setCommonCommandsInvalid(true);
       } else {
-        setCommonCommandsInvalid(false);
+        if (
+          // This regex will return null if the input is not in format of (int, int , int)
+          row.commonCommands.match(/^(?:\s*\d+\s*,\s*)*[\d|\s]+$/) == null ||
+          row.commonCommands == "()"
+        ) {
+          isValid = false;
+          setCommonCommandsInvalid(true);
+        } else {
+          setCommonCommandsInvalid(false);
+        }
       }
-    }
-    //validate allCommands input
-    if (row.allCommands.length == 0) {
-      isValid = false;
-      setAllCommandsInvalid(true);
-    } else {
-      if (
-        row.allCommands.match(/^\((\d+[,]{0,1})*[\)]{0,1}$/) == null ||
-        row.allCommands == "()"
-      ) {
+      //validate allCommands input
+      if (row.allCommands.length == 0) {
         isValid = false;
         setAllCommandsInvalid(true);
       } else {
-        setAllCommandsInvalid(false);
+        if (
+          row.allCommands.match(/^(?:\s*\d+\s*,\s*)*[\d|\s]+$/) == null ||
+          row.allCommands == "()"
+        ) {
+          isValid = false;
+          setAllCommandsInvalid(true);
+        } else {
+          setAllCommandsInvalid(false);
+        }
       }
-    }
 
-    //validate blockedCommands input
-    if (row.blockedCommands.length == 0) {
-      isValid = false;
-      setBlockedCommandsInvalid(true);
-    } else {
-      if (
-        row.blockedCommands.match(/^\((\d+[,]{0,1})*[\)]{0,1}$/) == null ||
-        row.blockedCommands == "()"
-      ) {
+      //validate blockedCommands input
+      if (row.blockedCommands.length == 0) {
         isValid = false;
         setBlockedCommandsInvalid(true);
       } else {
-        setBlockedCommandsInvalid(false);
+        if (
+          row.blockedCommands.match(/^(?:\s*\d+\s*,\s*)*[\d|\s]+$/) == null ||
+          row.blockedCommands == "()"
+        ) {
+          isValid = false;
+          setBlockedCommandsInvalid(true);
+        } else {
+          setBlockedCommandsInvalid(false);
+        }
       }
-    }
 
-    //validate commonReports input
-    if (row.commonReports.length == 0) {
-      isValid = false;
-      setCommonReportsInvalid(true);
-    } else {
-      if (
-        row.commonReports.match(/^\((\d+[,]{0,1})*[\)]{0,1}$/) == null ||
-        row.commonReports == "()"
-      ) {
+      //validate commonReports input
+      if (row.commonReports.length == 0) {
         isValid = false;
         setCommonReportsInvalid(true);
       } else {
-        setCommonReportsInvalid(false);
+        if (
+          row.commonReports.match(/^(?:\s*\d+\s*,\s*)*[\d|\s]+$/) == null ||
+          row.commonReports == "()"
+        ) {
+          isValid = false;
+          setCommonReportsInvalid(true);
+        } else {
+          setCommonReportsInvalid(false);
+        }
       }
-    }
 
-    //validate allReports input
-    if (row.allReports.length == 0) {
-      isValid = false;
-      setAllReportsInvalid(true);
-    } else {
-      if (
-        row.allReports.match(/^\((\d+[,]{0,1})*[\)]{0,1}$/) == null ||
-        row.allReports == "()"
-      ) {
+      //validate allReports input
+      if (row.allReports.length == 0) {
         isValid = false;
         setAllReportsInvalid(true);
       } else {
-        setAllReportsInvalid(false);
+        if (
+          row.allReports.match(/^(?:\s*\d+\s*,\s*)*[\d|\s]+$/) == null ||
+          row.allReports == "()"
+        ) {
+          isValid = false;
+          setAllReportsInvalid(true);
+        } else {
+          setAllReportsInvalid(false);
+        }
       }
-    }
 
-    //validate blockedReports input
-    if (row.blockedReports.length == 0) {
-      isValid = false;
-      setBlockedReportsInvalid(true);
-    } else {
-      if (
-        row.blockedReports.match(/^\((\d+[,]{0,1})*[\)]{0,1}$/) == null ||
-        row.blockedReports == "()"
-      ) {
+      //validate blockedReports input
+      if (row.blockedReports.length == 0) {
         isValid = false;
         setBlockedReportsInvalid(true);
       } else {
-        setBlockedReportsInvalid(false);
+        if (
+          row.blockedReports.match(/^(?:\s*\d+\s*,\s*)*[\d|\s]+$/) == null ||
+          row.blockedReports == "()"
+        ) {
+          isValid = false;
+          setBlockedReportsInvalid(true);
+        } else {
+          setBlockedReportsInvalid(false);
+        }
       }
-    }
 
-    return isValid;
+      return isValid;
+    } catch (error) {
+      console.log("error", error);
+    }
   };
 
   const formSubmitted = async () => {
@@ -229,13 +231,12 @@ const NewRole = (props) => {
                   style={{
                     border: commonCommandsInvalid ? "1px solid red" : "",
                   }}
-                  placeholder="(x,y,z)"
+                  placeholder={placeHolderForArrayInput}
                 />
               </Form.Item>
               {commonCommandsInvalid ? (
                 <h5 style={{ color: "red" }}>
-                  {" "}
-                  פקודות נפוצות חייבות להיות בפרומט (int,int,...){" "}
+                  פקודות נפוצות חייבות להיות בפורמט {placeHolderForArrayInput}
                 </h5>
               ) : (
                 ""
@@ -257,13 +258,12 @@ const NewRole = (props) => {
               >
                 <Input
                   style={{ border: allCommandsInvalid ? "1px solid red" : "" }}
-                  placeholder="(x,y,z)"
+                  placeholder={placeHolderForArrayInput}
                 />
               </Form.Item>
               {allCommandsInvalid ? (
                 <h5 style={{ color: "red" }}>
-                  {" "}
-                  כל הפקודות חייבות להיות בפרומט (int,int,...){" "}
+                  כל הפקודות חייבות להיות בפורמט {placeHolderForArrayInput}
                 </h5>
               ) : (
                 ""
@@ -284,13 +284,12 @@ const NewRole = (props) => {
                   style={{
                     border: blockedCommandsInvalid ? "1px solid red" : "",
                   }}
-                  placeholder="(x,y,z)"
+                  placeholder={placeHolderForArrayInput}
                 />
               </Form.Item>
               {blockedCommandsInvalid ? (
                 <h5 style={{ color: "red" }}>
-                  {" "}
-                  פקודות חסומות חייבות להיות בפרומט (int,int,...){" "}
+                  פקודות חסומות חייבות להיות בפורמט {placeHolderForArrayInput}
                 </h5>
               ) : (
                 ""
@@ -312,13 +311,12 @@ const NewRole = (props) => {
                   style={{
                     border: commonReportsInvalid ? "1px solid red" : "",
                   }}
-                  placeholder="(x,y,z)"
+                  placeholder={placeHolderForArrayInput}
                 />
               </Form.Item>
               {commonReportsInvalid ? (
                 <h5 style={{ color: "red" }}>
-                  {" "}
-                  דוחות נפוצים חייבים להיות בפרומט (int,int,...){" "}
+                  דוחות נפוצים חייבים להיות בפורמט {placeHolderForArrayInput}
                 </h5>
               ) : (
                 ""
@@ -340,13 +338,12 @@ const NewRole = (props) => {
               >
                 <Input
                   style={{ border: allReportsInvalid ? "1px solid red" : "" }}
-                  placeholder="(x,y,z)"
+                  placeholder={placeHolderForArrayInput}
                 />
               </Form.Item>
               {allReportsInvalid ? (
                 <h5 style={{ color: "red" }}>
-                  {" "}
-                  כל הדוחות חייבים להיות בפרומט (int,int,...){" "}
+                  כל הדוחות חייבים להיות בפורמט {placeHolderForArrayInput}
                 </h5>
               ) : (
                 ""
@@ -367,13 +364,12 @@ const NewRole = (props) => {
                   style={{
                     border: blockedReportsInvalid ? "1px solid red" : "",
                   }}
-                  placeholder="(x,y,z)"
+                  placeholder={placeHolderForArrayInput}
                 />
               </Form.Item>
-              {allReportsInvalid ? (
+              {blockedReportsInvalid ? (
                 <h5 style={{ color: "red" }}>
-                  {" "}
-                  דוחות חסומים חייבים להיות בפרומט (int,int,...){" "}
+                  דוחות חסומים חייבים להיות בפורמט {placeHolderForArrayInput}
                 </h5>
               ) : (
                 ""
@@ -399,8 +395,7 @@ const NewRole = (props) => {
               title="שים לב, הנתונים יימחקו"
               onConfirm={() => closeForm()}
             >
-              <Button type="primary" 
-              data-testid="closeNewRoleFormButton">
+              <Button type="primary" data-testid="closeNewRoleFormButton">
                 סגירה
               </Button>
             </Popconfirm>

@@ -1,24 +1,19 @@
 import React, { useState, useEffect } from "react";
-import { Table, Popconfirm, Button, Space, Form, Input } from "antd";
-import {
-  SearchOutlined,
-  ReloadOutlined,
-  EditOutlined,
-  DeleteOutlined,
-  SaveOutlined,
-  CloseOutlined,
-  ExportOutlined,
-} from "@ant-design/icons";
+import { Table, Button, Space, Form, Input } from "antd";
+import { SearchOutlined } from "@ant-design/icons";
 import Highlighter from "react-highlight-words";
-import { CSVLink } from "react-csv";
 import { db } from "../firebase-config";
 import {
   collection,
   getDocs,
   doc,
   updateDoc,
+  query,
+  where,
 } from "firebase/firestore";
-import NewRole from "./NewRole";
+import ButtonsInEditColumn from "./ButtonsInEditColumn";
+import ExportTableButton from "./ExportTableButton";
+import AboveTableComponents from "./AboveTableComponents";
 
 //Main func, return the final DT of role data table
 const RoleDataDT = (props) => {
@@ -65,6 +60,8 @@ const RoleDataDT = (props) => {
   const [filtersForAllReports, setfiltersForAllReports] = useState("");
   const [filtersForBlockedReports, setfiltersForBlockedReports] = useState("");
 
+  const arrayValidationMessage = " חייבות להיות בפורמט int,int,int...";
+
   // Vars that will hold the selected values in special inputs
   let searchedText;
 
@@ -72,36 +69,50 @@ const RoleDataDT = (props) => {
 
   // This function will read data from DB into state
   const resetData = async () => {
-    setLoading(true);
-    // Read content from DB
-    const data = await getDocs(dataCollectionRef);
+    try {
+      setLoading(true);
+      // Read content from DB
+      const data = await getDocs(dataCollectionRef);
 
-    // Set contnet from DB into states.
-    // We will filter the values from docs to only not deleted items.
-    // Training data will be the state that contains the current view (filtered data)
-    setRoleData(
-      data.docs
-        .map((doc) => ({ ...doc.data(), id: doc.id, key: doc.id }))
-        .filter((element) => {
-          if (element.didDelete) {
-            return false;
-          }
-          return true;
-        })
-    );
+      // Set contnet from DB into states.
+      // We will filter the values from docs to only not deleted items.
+      // Training data will be the state that contains the current view (filtered data)
+      setRoleData(
+        data.docs
+          .map((doc) => ({
+            ...doc.data(),
+            id: doc.id,
+            key: doc.id,
+            commonCommands: doc.data().commonCommands.toString(),
+            allCommands: doc.data().allCommands.toString(),
+            blockedCommands: doc.data().blockedCommands.toString(),
+            commonReports: doc.data().commonReports.toString(),
+            allReports: doc.data().allReports.toString(),
+            blockedReports: doc.data().blockedReports.toString(),
+          }))
+          .filter((element) => {
+            if (element.didDelete) {
+              return false;
+            }
+            return true;
+          })
+      );
 
-    // Backup data is the state that will always contain the data from DB without changes
-    setBackUpData(
-      data.docs
-        .map((doc) => ({ ...doc.data(), id: doc.id, key: doc.id }))
-        .filter((element) => {
-          if (element.didDelete) {
-            return false;
-          }
-          return true;
-        })
-    );
-    setDataToExport(null);
+      // Backup data is the state that will always contain the data from DB without changes
+      setBackUpData(
+        data.docs
+          .map((doc) => ({ ...doc.data(), id: doc.id, key: doc.id }))
+          .filter((element) => {
+            if (element.didDelete) {
+              return false;
+            }
+            return true;
+          })
+      );
+      setDataToExport(null);
+    } catch (error) {
+      console.log("error", error);
+    }
   };
 
   // On first load- read data from DB
@@ -144,60 +155,73 @@ const RoleDataDT = (props) => {
   // We would like the filters to contain only distinct values, hence we will send values to
   // removeDuplicateFilters function.
   const addFiltersValue = () => {
-    let arrayOfAllDataInColumn; //this var will contain array of object with all the filters options
-    //set filters for id
-    arrayOfAllDataInColumn = RoleData.map((v) => ({ text: v.id, value: v.id }));
-    setfiltersForID(removeDuplicateFilters(arrayOfAllDataInColumn));
-    //set filters for type
-    arrayOfAllDataInColumn = RoleData.map((v) => ({
-      text: v.type,
-      value: v.type,
-    }));
-    setfiltersForType(removeDuplicateFilters(arrayOfAllDataInColumn));
-    //set filters for mkrcRole
-    arrayOfAllDataInColumn = RoleData.map((v) => ({
-      text: v.mkrcRole,
-      value: v.mkrcRole,
-    }));
-    setfiltersForMkrcRole(removeDuplicateFilters(arrayOfAllDataInColumn));
-    //set filters for commonCommands
-    arrayOfAllDataInColumn = RoleData.map((v) => ({
-      text: v.commonCommands,
-      value: v.commonCommands,
-    }));
-    setfiltersForCommonCommands(removeDuplicateFilters(arrayOfAllDataInColumn));
-    //set filters for allCommands
-    arrayOfAllDataInColumn = RoleData.map((v) => ({
-      text: v.allCommands,
-      value: v.allCommands,
-    }));
-    setfiltersForAllCommands(removeDuplicateFilters(arrayOfAllDataInColumn));
-    //set filters for blockedCommands
-    arrayOfAllDataInColumn = RoleData.map((v) => ({
-      text: v.blockedCommands,
-      value: v.blockedCommands,
-    }));
-    setfiltersForBlockedCommands(
-      removeDuplicateFilters(arrayOfAllDataInColumn)
-    );
-    //set filters for type
-    arrayOfAllDataInColumn = RoleData.map((v) => ({
-      text: v.commonReports,
-      value: v.commonReports,
-    }));
-    setfiltersForCommonReports(removeDuplicateFilters(arrayOfAllDataInColumn));
-    //set filters for allReports
-    arrayOfAllDataInColumn = RoleData.map((v) => ({
-      text: v.allReports,
-      value: v.allReports,
-    }));
-    setfiltersForAllReports(removeDuplicateFilters(arrayOfAllDataInColumn));
-    //set filters for blockedReports
-    arrayOfAllDataInColumn = RoleData.map((v) => ({
-      text: v.blockedReports,
-      value: v.blockedReports,
-    }));
-    setfiltersForBlockedReports(removeDuplicateFilters(arrayOfAllDataInColumn));
+    try {
+      let arrayOfAllDataInColumn; //this var will contain array of object with all the filters options
+      //set filters for id
+      arrayOfAllDataInColumn = RoleData.map((v) => ({
+        text: v.id,
+        value: v.id,
+      }));
+      setfiltersForID(removeDuplicateFilters(arrayOfAllDataInColumn));
+      //set filters for type
+      arrayOfAllDataInColumn = RoleData.map((v) => ({
+        text: v.type,
+        value: v.type,
+      }));
+      setfiltersForType(removeDuplicateFilters(arrayOfAllDataInColumn));
+      //set filters for mkrcRole
+      arrayOfAllDataInColumn = RoleData.map((v) => ({
+        text: v.mkrcRole,
+        value: v.mkrcRole,
+      }));
+      setfiltersForMkrcRole(removeDuplicateFilters(arrayOfAllDataInColumn));
+      //set filters for commonCommands
+      arrayOfAllDataInColumn = RoleData.map((v) => ({
+        text: v.commonCommands,
+        value: v.commonCommands,
+      }));
+      setfiltersForCommonCommands(
+        removeDuplicateFilters(arrayOfAllDataInColumn)
+      );
+      //set filters for allCommands
+      arrayOfAllDataInColumn = RoleData.map((v) => ({
+        text: v.allCommands,
+        value: v.allCommands,
+      }));
+      setfiltersForAllCommands(removeDuplicateFilters(arrayOfAllDataInColumn));
+      //set filters for blockedCommands
+      arrayOfAllDataInColumn = RoleData.map((v) => ({
+        text: v.blockedCommands,
+        value: v.blockedCommands,
+      }));
+      setfiltersForBlockedCommands(
+        removeDuplicateFilters(arrayOfAllDataInColumn)
+      );
+      //set filters for type
+      arrayOfAllDataInColumn = RoleData.map((v) => ({
+        text: v.commonReports,
+        value: v.commonReports,
+      }));
+      setfiltersForCommonReports(
+        removeDuplicateFilters(arrayOfAllDataInColumn)
+      );
+      //set filters for allReports
+      arrayOfAllDataInColumn = RoleData.map((v) => ({
+        text: v.allReports,
+        value: v.allReports,
+      }));
+      setfiltersForAllReports(removeDuplicateFilters(arrayOfAllDataInColumn));
+      //set filters for blockedReports
+      arrayOfAllDataInColumn = RoleData.map((v) => ({
+        text: v.blockedReports,
+        value: v.blockedReports,
+      }));
+      setfiltersForBlockedReports(
+        removeDuplicateFilters(arrayOfAllDataInColumn)
+      );
+    } catch (error) {
+      console.log("error", error);
+    }
   };
 
   //This function removes duplicates values from filtering options array
@@ -224,17 +248,38 @@ const RoleDataDT = (props) => {
 
   // Delete function, delete object from DB & from view
   const deleteRole = async (id, value) => {
-    const trainDoc = doc(db, "RoleDataDT", id);
-    // Delete doc from db (update field- didDelete -> true)
-    let deleteUpdate = {
-      didDelete: true,
-    };
-    await updateDoc(trainDoc, deleteUpdate);
-    // Delete doc from view
-    const filteredData = RoleData.filter((item) => item.id !== value.id);
-    setRoleData(filteredData);
-    setBackUpData(filteredData);
-    setGridData(RoleData);
+    try {
+      const trainDoc = doc(db, "RoleDataDT", id);
+      // Delete doc from db (update field- didDelete -> true)
+      let deleteUpdate = {
+        didDelete: true,
+      };
+      await updateDoc(trainDoc, deleteUpdate);
+      // Delete doc from view
+      const filteredData = RoleData.filter((item) => item.id !== value.id);
+      setRoleData(filteredData);
+      setBackUpData(filteredData);
+      setGridData(RoleData);
+
+      // Delete all the dependencies - users with this role id
+      const q = query(collection(db, "UserDataDT"), where("roleId", "==", id));
+      let docProcessed = 0;
+      const querySnapshot = await getDocs(q);
+      querySnapshot.forEach((doc) => {
+        docProcessed++;
+        updateDoc(doc.ref, deleteUpdate);
+        // if loop ended- update the data in users dt
+        if (docProcessed == querySnapshot.size) {
+          props.setDidDataChanged(true);
+        }
+      });
+      if (querySnapshot.size == 0) {
+        // There is not any doc that just updated- not entered the previous loop
+        props.setDidDataChanged(true);
+      }
+    } catch (error) {
+      console.log("error", error);
+    }
   };
 
   // This function return true/false: is this row currently in editing mode?
@@ -291,8 +336,7 @@ const RoleDataDT = (props) => {
     } else {
       if (
         // This regex will return string if the input is a valid (int, int, int,...)
-        row.commonCommands.match(/^\((\d+[,]{0,1})*[\)]{0,1}$/) == null ||
-        row.commonCommands == "()"
+        String(row.commonCommands).match(/^(?:\s*\d+\s*,\s*)*[\d|\s]+$/) == null
       ) {
         isValid = false;
         setCommonCommandsInvalid(true);
@@ -307,8 +351,7 @@ const RoleDataDT = (props) => {
     } else {
       if (
         // This regex will return string if the input is a valid (int, int, int,...)
-        row.allCommands.match(/^\((\d+[,]{0,1})*[\)]{0,1}$/) == null ||
-        row.allCommands == "()"
+        String(row.allCommands).match(/^(?:\s*\d+\s*,\s*)*[\d|\s]+$/) == null
       ) {
         isValid = false;
         setAllCommandsInvalid(true);
@@ -322,8 +365,8 @@ const RoleDataDT = (props) => {
       setBlockedCommandsInvalid(true);
     } else {
       if (
-        row.blockedCommands.match(/^\((\d+[,]{0,1})*[\)]{0,1}$/) == null ||
-        row.blockedCommands == "()"
+        String(row.blockedCommands).match(/^(?:\s*\d+\s*,\s*)*[\d|\s]+$/) ==
+        null
       ) {
         isValid = false;
         setBlockedCommandsInvalid(true);
@@ -337,8 +380,7 @@ const RoleDataDT = (props) => {
       setCommonReportsInvalid(true);
     } else {
       if (
-        row.commonReports.match(/^\((\d+[,]{0,1})*[\)]{0,1}$/) == null ||
-        row.commonReports == "()"
+        String(row.commonReports).match(/^(?:\s*\d+\s*,\s*)*[\d|\s]+$/) == null
       ) {
         isValid = false;
         setCommonReportsInvalid(true);
@@ -352,8 +394,7 @@ const RoleDataDT = (props) => {
       setAllReportsInvalid(true);
     } else {
       if (
-        row.allReports.match(/^\((\d+[,]{0,1})*[\)]{0,1}$/) == null ||
-        row.allReports == "()"
+        String(row.allReports).match(/^(?:\s*\d+\s*,\s*)*[\d|\s]+$/) == null
       ) {
         isValid = false;
         setAllReportsInvalid(true);
@@ -367,8 +408,7 @@ const RoleDataDT = (props) => {
       setBlockedReportsInvalid(true);
     } else {
       if (
-        row.blockedReports.match(/^\((\d+[,]{0,1})*[\)]{0,1}$/) == null ||
-        row.blockedReports == "()"
+        String(row.blockedReports).match(/^(?:\s*\d+\s*,\s*)*[\d|\s]+$/) == null
       ) {
         isValid = false;
         setBlockedReportsInvalid(true);
@@ -395,12 +435,20 @@ const RoleDataDT = (props) => {
           let newRole = {
             type: parseInt(row.type),
             mkrcRole: parseInt(row.mkrcRole),
-            commonCommands: row.commonCommands,
-            allCommands: row.allCommands,
-            blockedCommands: row.blockedCommands,
-            commonReports: row.commonReports,
-            allReports: row.allReports,
-            blockedReports: row.blockedReports,
+            commonCommands: String(row.commonCommands)
+              .replace(" ", "")
+              .split(","),
+            allCommands: String(row.allCommands).replace(" ", "").split(","),
+            blockedCommands: String(row.blockedCommands)
+              .replace(" ", "")
+              .split(","),
+            commonReports: String(row.commonReports)
+              .replace(" ", "")
+              .split(","),
+            allReports: String(row.allReports).replace(" ", "").split(","),
+            blockedReports: String(row.blockedReports)
+              .replace(" ", "")
+              .split(","),
             didDelete: false,
           };
 
@@ -475,7 +523,9 @@ const RoleDataDT = (props) => {
             Search
           </Button>
           <Button
-            onClick={() => handleResetCol(clearFilters,selectedKeys, confirm, dataIndex)}
+            onClick={() =>
+              handleResetCol(clearFilters, selectedKeys, confirm, dataIndex)
+            }
             size="small"
             style={{ width: 90 }}
           >
@@ -533,7 +583,7 @@ const RoleDataDT = (props) => {
       dataIndex: "type",
       align: "center",
       editTable: true,
-      sorter: (a, b) => a.type.localeCompare(b.type),
+      sorter: (a, b) => a.type - b.type,
       sortOrder: sortedInfo.columnKey === "type" && sortedInfo.order,
       //...getColumnSearchProps("type"),
       filters: filtersForType,
@@ -546,7 +596,7 @@ const RoleDataDT = (props) => {
       dataIndex: "mkrcRole",
       align: "center",
       editTable: true,
-      sorter: (a, b) => a.mkrcRole.localeCompare(b.mkrcRole),
+      sorter: (a, b) => a.mkrcRole - b.mkrcRole,
       sortOrder: sortedInfo.columnKey === "mkrcRole" && sortedInfo.order,
       // ...getColumnSearchProps("mkrcRole"),
       filters: filtersForMkrcRole,
@@ -636,51 +686,15 @@ const RoleDataDT = (props) => {
       render: (_, record) => {
         const editable = isEditing(record);
         return RoleData.length >= 1 ? (
-          <Space>
-            <Popconfirm
-              title="האם אתה בטוח שברצונך למחוק?"
-              onConfirm={() => handleDelete(record)}
-            >
-              {editable ? (
-                ""
-              ) : (
-                <Button
-                  danger
-                  type="primary"
-                  disabled={editable}
-                  icon={<DeleteOutlined />}
-                />
-              )}
-            </Popconfirm>
-            {editable ? (
-              <span>
-                <Space size="medium">
-                  <Popconfirm
-                    title="האם אתה בטוח שברצונך לצאת?"
-                    onConfirm={cancel}
-                  >
-                    <Button icon={<CloseOutlined />} type="primary" danger />
-                  </Popconfirm>
-                  <Button
-                    icon={<SaveOutlined style={{ color: "white" }} />}
-                    onClick={() => save(record.key)}
-                    type="submit"
-                    style={{
-                      marginRight: 8,
-                      background: "green",
-                      borderColor: "green",
-                    }}
-                  />
-                </Space>
-              </span>
-            ) : (
-              <Button
-                onClick={() => edit(record)}
-                type="primary"
-                icon={<EditOutlined />}
-              />
-            )}
-          </Space>
+          <ButtonsInEditColumn
+            typeOfNewObject="role"
+            handleDelete={handleDelete}
+            record={record}
+            editable={editable}
+            edit={edit}
+            save={save}
+            cancel={cancel}
+          />
         ) : null;
       },
     },
@@ -728,7 +742,7 @@ const RoleDataDT = (props) => {
               />
             </Form.Item>
             {typeInvalid ? (
-              <h5 style={{ color: "red" }}> יש להזין ערך בשדה {title} </h5>
+              <h5 style={{ color: "red" }}> יש להזין מספר בשדה {title} </h5>
             ) : (
               ""
             )}
@@ -756,7 +770,7 @@ const RoleDataDT = (props) => {
               />
             </Form.Item>
             {mkrcRoleInvalid ? (
-              <h5 style={{ color: "red" }}> יש להזין ערך בשדה {title} </h5>
+              <h5 style={{ color: "red" }}> יש להזין מספר בשדה {title} </h5>
             ) : (
               ""
             )}
@@ -784,7 +798,7 @@ const RoleDataDT = (props) => {
             {commonCommandsInvalid ? (
               <h5 style={{ color: "red" }}>
                 {" "}
-                {title} חייבות להיות בפרומט (int,int,...){" "}
+                {title + arrayValidationMessage}
               </h5>
             ) : (
               ""
@@ -813,7 +827,7 @@ const RoleDataDT = (props) => {
             {allCommandsInvalid ? (
               <h5 style={{ color: "red" }}>
                 {" "}
-                {title} חייבות להיות בפרומט (int,int,...)
+                {title + arrayValidationMessage}
               </h5>
             ) : (
               ""
@@ -844,7 +858,7 @@ const RoleDataDT = (props) => {
             {blockedCommandsInvalid ? (
               <h5 style={{ color: "red" }}>
                 {" "}
-                {title} חייבות להיות בפרומט (int,int,...)
+                {title + arrayValidationMessage}
               </h5>
             ) : (
               ""
@@ -873,7 +887,7 @@ const RoleDataDT = (props) => {
             {commonReportsInvalid ? (
               <h5 style={{ color: "red" }}>
                 {" "}
-                {title} חייבים להיות בפרומט (int,int,...)
+                {title + arrayValidationMessage}
               </h5>
             ) : (
               ""
@@ -902,7 +916,7 @@ const RoleDataDT = (props) => {
             {allReportsInvalid ? (
               <h5 style={{ color: "red" }}>
                 {" "}
-                {title} חייבים להיות בפרומט (int,int,...)
+                {title + arrayValidationMessage}
               </h5>
             ) : (
               ""
@@ -931,7 +945,7 @@ const RoleDataDT = (props) => {
             {blockedReportsInvalid ? (
               <h5 style={{ color: "red" }}>
                 {" "}
-                {title} חייבים להיות בפרומט (int,int,...)
+                {title + arrayValidationMessage}
               </h5>
             ) : (
               ""
@@ -1045,58 +1059,18 @@ const RoleDataDT = (props) => {
   // Return the main table's JSX
   return (
     <div>
-      <div>
-        {showNewRoleForm ? (
-          <NewRole
-            formIsDone={letMeKnowFormIsDone}
-            dataChanged={letMeKnowUserAddedDataToDB}
-          />
-        ) : (
-          ""
-        )}{" "}
-      </div>
-      <Space style={{ scrollMarginBottom: 16 }}>
-        <Input
-          placeholder="חפש תפקיד"
-          onChange={handleInputChange}
-          type="text"
-          allowClear
-          style={{
-            border: "none",
-            borderBottom: "1px solid ",
-            marginRight: "20px",
-          }}
-          value={emptySearchText ? "" : searchedText}
-          suffix={
-            <Button
-              onClick={globalSearch}
-              data-testid="globalSearchInputButton" 
-              type="text"
-              icon={<SearchOutlined />}
-            />
-          }
-        />
-        <Button
-          onClick={reset}
-          icon={<ReloadOutlined />}
-          data-testid="reloadDataButton" 
-          type="text"
-          style={{ marginRight: "20px" }}
-        />
-        {!showNewRoleForm ? (
-          <Button
-            onClick={newDataHandle}
-            size="large"
-            data-testid="createNewObjectInDBButton" 
-            style={{ position: "absolute", left: 0, top: 0, color: "#1890ff" }}
-            type="text"
-          >
-            צור תפקיד חדש
-          </Button>
-        ) : (
-          ""
-        )}
-      </Space>
+      <AboveTableComponents
+        typeOfNewObject="role"
+        letMeKnowFormIsDone={letMeKnowFormIsDone}
+        letMeKnowUserAddedDataToDB={letMeKnowUserAddedDataToDB}
+        handleInputChange={handleInputChange}
+        emptySearchText={emptySearchText}
+        searchedText={searchedText}
+        globalSearch={globalSearch}
+        reset={reset}
+        showNewObjectForm={showNewRoleForm}
+        newDataHandle={newDataHandle}
+      />
       <Form form={form} component={false}>
         <Table
           columns={mergedColumns}
@@ -1116,26 +1090,11 @@ const RoleDataDT = (props) => {
           tableLayout="fixed"
         />
       </Form>
-      <Button
-        icon={<ExportOutlined />}
-        type="text"
-        size="large"
-        style={{ marginRight: "20px" }}
-      >
-        <CSVLink
-          data={
-            //TrainingData && TrainingData.length ? TrainingData : BackUpData
-            dataToExport && dataToExport.length
-              ? dataToExport
-              : RoleData && RoleData.length
-              ? RoleData
-              : BackUpData
-          }
-          style={{ color: "black" }}
-        >
-          יצא טבלה
-        </CSVLink>
-      </Button>
+      <ExportTableButton
+        dataToExport={dataToExport}
+        DataOfDT={RoleData}
+        BackUpData={BackUpData}
+      />
     </div>
   );
 };

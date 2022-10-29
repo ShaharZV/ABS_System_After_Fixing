@@ -6,7 +6,7 @@ function SelectExerciseAndRole(props){
 
   //set array of options
   let arrayOfAllDataInColumn;
-  arrayOfAllDataInColumn = props.dataForOptions.map(v => (<Option value={v.id}>{v.id}</Option>));
+  arrayOfAllDataInColumn = props.dataForOptions.map(v => (<Option value={v.id} key={v.id}>{v.id}</Option>));
   const updateSelectedChioce = (selectedOption) => {
     props.updateSelectFunc(selectedOption, props.typeOfSelect)
   }

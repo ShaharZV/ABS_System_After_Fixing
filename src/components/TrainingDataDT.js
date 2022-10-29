@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from "react";
 import {
   Table,
-  Popconfirm,
   Button,
   Space,
   Form,
@@ -11,17 +10,8 @@ import {
   Select,
   Badge,
 } from "antd";
-import {
-  SearchOutlined,
-  EditOutlined,
-  DeleteOutlined,
-  SaveOutlined,
-  CloseOutlined,
-  ReloadOutlined,
-  ExportOutlined,
-} from "@ant-design/icons";
+import { SearchOutlined } from "@ant-design/icons";
 import Highlighter from "react-highlight-words";
-import { CSVLink } from "react-csv";
 import moment from "moment";
 import "../CSS/TrainingDataDT.css";
 import { db } from "../firebase-config";
@@ -31,8 +21,12 @@ import {
   Timestamp,
   doc,
   updateDoc,
+  query,
+  where,
 } from "firebase/firestore";
-import NewExercise from "./NewExercise";
+import ButtonsInEditColumn from "./ButtonsInEditColumn";
+import ExportTableButton from "./ExportTableButton";
+import AboveTableComponents from "./AboveTableComponents";
 
 // Main func, return the final DT of exercise data table
 const TrainingDataDT = (props) => {
@@ -95,51 +89,55 @@ const TrainingDataDT = (props) => {
 
   // This function will read data from DB into state
   const resetData = async () => {
-    setLoading(true);
-    // Read content from DB
-    const data = await getDocs(dataCollectionRef);
+    try {
+      setLoading(true);
+      // Read content from DB
+      const data = await getDocs(dataCollectionRef);
 
-    // Set contnet from DB into states.
-    // We will filter the values from docs to only not deleted items.
-    // Training data will be the state that contains the current view (filtered data)
-    setTrainingData(
-      data.docs
-        .map((doc) => ({
-          ...doc.data(),
-          id: doc.id,
-          key: doc.id,
-          startDateTime: doc.data().startDateTime.toDate().toString(),
-          endDateTime: doc.data().endDateTime.toDate().toString(),
-          creationTime: doc.data().creationTime.toDate().toString(),
-        }))
-        .filter((element) => {
-          if (element.didDelete) {
-            return false;
-          }
-          return true;
-        })
-    );
+      // Set contnet from DB into states.
+      // We will filter the values from docs to only not deleted items.
+      // Training data will be the state that contains the current view (filtered data)
+      setTrainingData(
+        data.docs
+          .map((doc) => ({
+            ...doc.data(),
+            id: doc.id,
+            key: doc.id,
+            startDateTime: doc.data().startDateTime.toDate().toString(),
+            endDateTime: doc.data().endDateTime.toDate().toString(),
+            creationTime: doc.data().creationTime.toDate().toString(),
+          }))
+          .filter((element) => {
+            if (element.didDelete) {
+              return false;
+            }
+            return true;
+          })
+      );
 
-    // Backup data is the state that will always contain the data from DB without changes
-    setBackUpData(
-      data.docs
-        .map((doc) => ({
-          ...doc.data(),
-          id: doc.id,
-          key: doc.id,
-          startDateTime: doc.data().startDateTime.toDate().toString(),
-          endDateTime: doc.data().endDateTime.toDate().toString(),
-          creationTime: doc.data().creationTime.toDate().toString(),
-        }))
-        .filter((element) => {
-          if (element.didDelete) {
-            return false;
-          }
-          return true;
-        })
-    );
+      // Backup data is the state that will always contain the data from DB without changes
+      setBackUpData(
+        data.docs
+          .map((doc) => ({
+            ...doc.data(),
+            id: doc.id,
+            key: doc.id,
+            startDateTime: doc.data().startDateTime.toDate().toString(),
+            endDateTime: doc.data().endDateTime.toDate().toString(),
+            creationTime: doc.data().creationTime.toDate().toString(),
+          }))
+          .filter((element) => {
+            if (element.didDelete) {
+              return false;
+            }
+            return true;
+          })
+      );
 
-    setDataToExport(null);
+      setDataToExport(null);
+    } catch (error) {
+      console.log("error", error);
+    }
   };
 
   // On first load- read data from DB
@@ -290,17 +288,42 @@ const TrainingDataDT = (props) => {
 
   // Delete function, delete object from DB & from view
   const deleteTraining = async (id, value) => {
-    const exerciseDoc = doc(db, "TrainingDataDT", id);
-    // Delete doc from db (update field- didDelete -> true)
-    let deleteUpdate = {
-      didDelete: true,
-    };
-    await updateDoc(exerciseDoc, deleteUpdate);
-    // Delete doc from view
-    const filteredData = TrainingData.filter((item) => item.id !== value.id);
-    setTrainingData(filteredData);
-    setBackUpData(filteredData);
-    setGridData(TrainingData);
+    try {
+      const exerciseDoc = doc(db, "TrainingDataDT", id);
+      // Delete doc from db (update field- didDelete -> true)
+      let deleteUpdate = {
+        didDelete: true,
+      };
+      await updateDoc(exerciseDoc, deleteUpdate);
+
+      // Delete doc from view
+      const filteredData = TrainingData.filter((item) => item.id !== value.id);
+      setTrainingData(filteredData);
+      setBackUpData(filteredData);
+      setGridData(TrainingData);
+
+      // Delete all the dependencies - users with this exercise id
+      const q = query(
+        collection(db, "UserDataDT"),
+        where("exerciseId", "==", id)
+      );
+      let docProcessed = 0;
+      const querySnapshot = await getDocs(q);
+      querySnapshot.forEach((doc) => {
+        docProcessed++;
+        updateDoc(doc.ref, deleteUpdate);
+        // if loop ended- update the data in users dt
+        if (docProcessed == querySnapshot.size) {
+          props.setDidDataChanged(true);
+        }
+      });
+      if (querySnapshot.size == 0) {
+        // There is not any doc that just updated- not entered the previous loop
+        props.setDidDataChanged(true);
+      }
+    } catch (error) {
+      console.log("error", error);
+    }
   };
 
   // This function return true/false: is this row currently in editing mode?
@@ -315,108 +338,112 @@ const TrainingDataDT = (props) => {
 
   // Custom validation to row (input of edit-from), after user submitted form
   const validateFieldsContent = (row) => {
-    let isValid = true;
-    //Check if input fields are not empty&  valid.
-    if (row.startDateTime.length == 0) {
-      isValid = false;
-      setStartDateInvalid(true);
-    } else {
-      setStartDateInvalid(false);
-    }
+    try {
+      let isValid = true;
+      //Check if input fields are not empty&  valid.
+      if (row.startDateTime.length == 0) {
+        isValid = false;
+        setStartDateInvalid(true);
+      } else {
+        setStartDateInvalid(false);
+      }
 
-    if (row.endDateTime.length == 0) {
-      isValid = false;
-      setEndDateInvalid(true);
-    } else {
-      setEndDateInvalid(false);
-    }
+      if (row.endDateTime.length == 0) {
+        isValid = false;
+        setEndDateInvalid(true);
+      } else {
+        setEndDateInvalid(false);
+      }
 
-    if (row.creationTime.length == 0) {
-      isValid = false;
-      setCreationTimeInvalid(true);
-    } else {
-      setCreationTimeInvalid(false);
-    }
-    //check if end datetime is after start datetime
-    let start = new Date(row.startDateTime);
-    let end = new Date(row.endDateTime);
+      if (row.creationTime.length == 0) {
+        isValid = false;
+        setCreationTimeInvalid(true);
+      } else {
+        setCreationTimeInvalid(false);
+      }
+      //check if end datetime is after start datetime
+      let start = new Date(row.startDateTime);
+      let end = new Date(row.endDateTime);
 
-    if (end < start) {
-      isValid = false;
-      setEndDateInvalid(true);
-    }
+      if (end < start) {
+        isValid = false;
+        setEndDateInvalid(true);
+      }
 
-    if (row.name.length == 0) {
-      isValid = false;
-      setNameInvalid(true);
-    } else {
-      setNameInvalid(false);
-    }
+      if (row.name.length == 0) {
+        isValid = false;
+        setNameInvalid(true);
+      } else {
+        setNameInvalid(false);
+      }
 
-    if (row.courtPath.length == 0) {
-      isValid = false;
-      setCourtPathInvalid(true);
-    } else {
-      setCourtPathInvalid(false);
-    }
+      if (row.courtPath.length == 0) {
+        isValid = false;
+        setCourtPathInvalid(true);
+      } else {
+        setCourtPathInvalid(false);
+      }
 
-    if (row.timeStepGepTime.length == 0) {
-      isValid = false;
-      setTimeStepGepInvalid(true);
-    } else {
-      if (
-        row.timeStepGepTime.toString().includes(".") ||
-        row.timeStepGepTime.toString().includes("+") ||
-        row.timeStepGepTime.toString().includes("-")
-      ) {
-        //input is not an integer then
+      if (row.timeStepGepTime.length == 0) {
         isValid = false;
         setTimeStepGepInvalid(true);
       } else {
-        setTimeStepGepInvalid(false);
+        if (
+          row.timeStepGepTime.toString().includes(".") ||
+          row.timeStepGepTime.toString().includes("+") ||
+          row.timeStepGepTime.toString().includes("-")
+        ) {
+          //input is not an integer then
+          isValid = false;
+          setTimeStepGepInvalid(true);
+        } else {
+          setTimeStepGepInvalid(false);
+        }
       }
-    }
 
-    if (row.type.length == 0) {
-      isValid = false;
-      setTypeInvalid(true);
-    } else {
-      setTypeInvalid(false);
-    }
+      if (row.type.length == 0) {
+        isValid = false;
+        setTypeInvalid(true);
+      } else {
+        setTypeInvalid(false);
+      }
 
-    if (row.status.length == 0) {
-      isValid = false;
-      setStatusInvalid(true);
-    } else {
-      setStatusInvalid(false);
-    }
+      if (row.status.length == 0) {
+        isValid = false;
+        setStatusInvalid(true);
+      } else {
+        setStatusInvalid(false);
+      }
 
-    if (row.numberOfDs.length == 0) {
-      isValid = false;
-      setNumberOfDsInvalid(true);
-    } else {
-      if (
-        // Check if it's Int
-        row.numberOfDs.toString().includes(".") ||
-        row.numberOfDs.toString().includes("+") ||
-        row.numberOfDs.toString().includes("-")
-      ) {
-        // Input is not an integer then
+      if (row.numberOfDs.length == 0) {
         isValid = false;
         setNumberOfDsInvalid(true);
       } else {
-        setNumberOfDsInvalid(false);
+        if (
+          // Check if it's Int
+          row.numberOfDs.toString().includes(".") ||
+          row.numberOfDs.toString().includes("+") ||
+          row.numberOfDs.toString().includes("-")
+        ) {
+          // Input is not an integer then
+          isValid = false;
+          setNumberOfDsInvalid(true);
+        } else {
+          setNumberOfDsInvalid(false);
+        }
       }
-    }
 
-    if (row.exerciseName.length == 0) {
-      isValid = false;
-      setExerciseNameInvalid(true);
-    } else {
-      setExerciseNameInvalid(false);
-    }
+      if (row.exerciseName.length == 0) {
+        isValid = false;
+        setExerciseNameInvalid(true);
+      } else {
+        setExerciseNameInvalid(false);
+      }
 
-    return isValid;
+      return isValid;
+    } catch (error) {
+      console.log("error", error);
+    }
   };
 
   // If user press save changes after editing- insert new data to DB and update view
@@ -471,7 +498,7 @@ const TrainingDataDT = (props) => {
           BackUpData.splice(index, 1, { ...item, ...row });
           setGridData(TrainingData);
           setEditRowKey("");
-          props.setDidDataChanged(true);
+          // props.setDidDataChanged(true);
         }
       }
     } catch (error) {
@@ -541,7 +568,9 @@ const TrainingDataDT = (props) => {
             Search
           </Button>
           <Button
-            onClick={() => handleResetCol(clearFilters, selectedKeys, confirm, dataIndex)}
+            onClick={() =>
+              handleResetCol(clearFilters, selectedKeys, confirm, dataIndex)
+            }
             size="small"
             style={{ width: 90 }}
           >
@@ -765,53 +794,15 @@ const TrainingDataDT = (props) => {
       render: (_, record) => {
         const editable = isEditing(record);
         return TrainingData.length >= 1 ? (
-          <Space>
-            <Popconfirm
-              title="האם אתה בטוח שברצונך למחוק?"
-              onConfirm={() => handleDelete(record)}
-            >
-              {editable ? (
-                ""
-              ) : (
-                <Button
-                  danger
-                  type="primary"
-                  disabled={editable}
-                  icon={<DeleteOutlined />}
-                />
-              )}
-            </Popconfirm>
-            {editable ? (
-              <span>
-                <Space size="medium">
-                  <Popconfirm
-                    title="האם אתה בטוח שברצונך לצאת?"
-                    onConfirm={cancel}
-                  >
-                    <Button icon={<CloseOutlined />} type="primary" danger />
-                  </Popconfirm>
-                  <Button
-                    icon={<SaveOutlined style={{ color: "white" }} />}
-                    onClick={() => save(record.key)}
-                    type="submit"
-                    style={{
-                      marginRight: 8,
-                      background: "green",
-                      borderColor: "green",
-                    }}
-                  />
-                </Space>
-              </span>
-            ) : (
-              <Button
-                onClick={() => edit(record)}
-                type="primary"
-                text="bb"
-                icon={<EditOutlined />}
-                data-testid="editRowButton" 
-              />
-            )}
-          </Space>
+          <ButtonsInEditColumn
+            typeOfNewObject="training"
+            handleDelete={handleDelete}
+            record={record}
+            editable={editable}
+            edit={edit}
+            save={save}
+            cancel={cancel}
+          />
         ) : null;
       },
     },
@@ -952,7 +943,7 @@ const TrainingDataDT = (props) => {
               onChange={onChangeEndDT}
               format="YYYY-MM-DD HH:mm:ss"
               defaultValue={moment(record.endDateTime)}
-            /> 
+            />
             {endDateInvalid ? (
               <h5 style={{ color: "red" }}>
                 {title} חייב להיות אחרי תאריך התחלה{" "}
@@ -967,7 +958,7 @@ const TrainingDataDT = (props) => {
         editFieldJSX = (
           <div>
             <Form.Item
-              data-testid="timeStepGepTimeInputWhileEditing" 
+              data-testid="timeStepGepTimeInputWhileEditing"
               name={dataIndex}
               style={{ margin: 0 }}
               rules={[
@@ -1226,58 +1217,18 @@ const TrainingDataDT = (props) => {
   // Return the main table's JSX
   return (
     <div>
-      <div>
-        {showNewExerciseForm ? (
-          <NewExercise
-            formIsDone={letMeKnowFormIsDone}
-            dataChanged={letMeKnowUserAddedDataToDB}
-          />
-        ) : (
-          ""
-        )}{" "}
-      </div>
-      <Space style={{ scrollMarginBottom: 16 }}>
-        <Input
-          placeholder="חפש תרגיל"
-          onChange={handleInputChange}
-          type="text"
-          style={{
-            border: "none",
-            borderBottom: "1px solid ",
-            marginRight: "20px",
-          }}
-          allowClear
-          value={emptySearchText ? "" : searchedText}
-          suffix={
-            <Button
-              data-testid="globalSearchInputButton" 
-              onClick={globalSearch}
-              type="text"
-              icon={<SearchOutlined />}
-            />
-          }
-        />
-        <Button
-          onClick={reset}
-          data-testid="reloadDataButton" 
-          icon={<ReloadOutlined />}
-          type="text"
-          style={{ marginRight: "20px" }}
-        />
-        {!showNewExerciseForm ? (
-          <Button
-            onClick={newDataHandle}
-            data-testid="createNewObjectInDBButton" 
-            size="large"
-            style={{ position: "absolute", left: 0, top: 0, color: "#1890ff" }}
-            type="text"
-          >
-            צור תרגיל חדש
-          </Button>
-        ) : (
-          ""
-        )}
-      </Space>
+      <AboveTableComponents
+        typeOfNewObject="training"
+        letMeKnowFormIsDone={letMeKnowFormIsDone}
+        letMeKnowUserAddedDataToDB={letMeKnowUserAddedDataToDB}
+        handleInputChange={handleInputChange}
+        emptySearchText={emptySearchText}
+        searchedText={searchedText}
+        globalSearch={globalSearch}
+        reset={reset}
+        showNewObjectForm={showNewExerciseForm}
+        newDataHandle={newDataHandle}
+      />
       <Form form={form} component={false}>
         <Table
           columns={mergedColumns}
@@ -1299,26 +1250,11 @@ const TrainingDataDT = (props) => {
           tableLayout="fixed"
         />
       </Form>
-      <Button
-        icon={<ExportOutlined />}
-        type="text"
-        size="large"
-        style={{ marginRight: "20px" }}
-      >
-        <CSVLink
-          data={
-            //TrainingData && TrainingData.length ? TrainingData : BackUpData
-            dataToExport && dataToExport.length
-              ? dataToExport
-              : TrainingData && TrainingData.length
-              ? TrainingData
-              : BackUpData
-          }
-          style={{ color: "black" }}
-        >
-          יצא טבלה
-        </CSVLink>
-      </Button>
+      <ExportTableButton
+        dataToExport={dataToExport}
+        DataOfDT={TrainingData}
+        BackUpData={BackUpData}
+      />
     </div>
   );
 };

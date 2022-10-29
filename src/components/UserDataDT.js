@@ -1,27 +1,19 @@
 //Imports
 import React, { useState, useEffect } from "react";
-import { Table, Popconfirm, Button, Space, Form, Input, Select } from "antd";
+import { Table, Button, Space, Form, Input, Select } from "antd";
 import {
   SearchOutlined,
   ReloadOutlined,
-  DeleteOutlined,
-  CloseOutlined,
-  SaveOutlined,
-  EditOutlined,
   ExportOutlined,
 } from "@ant-design/icons";
 import Highlighter from "react-highlight-words";
 import { CSVLink } from "react-csv";
 import { db } from "../firebase-config";
-import {
-  collection,
-  getDocs,
-  deleteDoc,
-  doc,
-  updateDoc,
-} from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
 import SelectExerciseAndRole from "./SelectExerciseAndRole";
-import NewUser from "./NewUser";
+import ButtonsInEditColumn from "./ButtonsInEditColumn";
+import ExportTableButton from "./ExportTableButton";
+import AboveTableComponents from "./AboveTableComponents";
 
 // Main func, return the final DT of user's data table
 const UserDataDT = (props) => {
@@ -78,61 +70,80 @@ const UserDataDT = (props) => {
 
   // This function will read data from DB into state
   const resetData = async () => {
-    setLoading(true);
-    // Read content from DB
-    const data = await getDocs(dataCollectionRef);
-    // Set contnet from DB into states.
-    // We will filter the values from docs to only not deleted items.
-    // user data will be the state that contains the current view (filtered data)
-    setUserData(
-      data.docs
-        .map((doc) => ({
-          ...doc.data(),
-          id: doc.id,
-          key: doc.id,
-          canDebrief: doc.data().canDebrief.toString() == "true" ? "כן" : "לא",
-        }))
-        .filter((element) => {
-          if (element.didDelete) {
-            return false;
-          }
-          return true;
-        })
-    );
+    try {
+      setLoading(true);
+      // Read content from DB
+      const data = await getDocs(dataCollectionRef);
+      // Set contnet from DB into states.
+      // We will filter the values from docs to only not deleted items.
+      // user data will be the state that contains the current view (filtered data)
+      setUserData(
+        data.docs
+          .map((doc) => ({
+            ...doc.data(),
+            id: doc.id,
+            key: doc.id,
+            canDebrief:
+              doc.data().canDebrief.toString() == "true" ? "כן" : "לא",
+          }))
+          .filter((element) => {
+            if (element.didDelete) {
+              return false;
+            }
+            return true;
+          })
+      );
 
-    setBackUpData(
-      data.docs
-        .map((doc) => ({
-          ...doc.data(),
-          id: doc.id,
-          key: doc.id,
-          canDebrief: doc.data().canDebrief.toString(),
-        }))
-        .filter((element) => {
-          if (element.didDelete) {
-            return false;
-          }
-          return true;
-        })
-    );
+      setBackUpData(
+        data.docs
+          .map((doc) => ({
+            ...doc.data(),
+            id: doc.id,
+            key: doc.id,
+            canDebrief: doc.data().canDebrief.toString(),
+          }))
+          .filter((element) => {
+            if (element.didDelete) {
+              return false;
+            }
+            return true;
+          })
+      );
+    } catch (error) {
+      console.log("error", error);
+    }
 
-    // Get data for <Select> of exercise ID (also deleted exercises)
+    // Get data for <Select> of exercise ID
     const dataForSelectExercise = await getDocs(exerciseDataCollectionRef);
     setDataForExerciseOptions(
-      dataForSelectExercise.docs.map((doc) => ({
-        ...doc.data(),
-        id: doc.id,
-        key: doc.id,
-      }))
+      dataForSelectExercise.docs
+        .map((doc) => ({
+          ...doc.data(),
+          id: doc.id,
+          key: doc.id,
+        }))
+        .filter((element) => {
+          if (element.didDelete) {
+            return false;
+          }
+          return true;
+        })
     );
-    // Get data for <Select> of role ID (also deleted roles)
+    // Get data for <Select> of role ID
     const dataForSelectRole = await getDocs(roleDataCollectionRef);
     setDataForRoleOptions(
-      dataForSelectRole.docs.map((doc) => ({
-        ...doc.data(),
-        id: doc.id,
-        key: doc.id,
-      }))
+      dataForSelectRole.docs
+        .map((doc) => ({
+          ...doc.data(),
+          id: doc.id,
+          key: doc.id,
+        }))
+        .filter((element) => {
+          if (element.didDelete) {
+            return false;
+          }
+          return true;
+        })
     );
 
     setDataToExport(null);
@@ -146,11 +157,10 @@ const UserDataDT = (props) => {
   // If user changed the data in different tab- reload the data in this tab too
   useEffect(() => {
     // if need to reset data because of a change in DB in different table (didDataChanged == true)
-    if(props.didDataChangedState){
+    if (props.didDataChangedState) {
       resetData();
       props.setDidDataChanged(false);
     }
-    
   }, [props.didDataChangedState]);
 
   // When successfully readed data from DB into state, load the data in table's view
@@ -256,17 +266,21 @@ const UserDataDT = (props) => {
 
   // Delete function, delete object from DB & from view
   const deleteUser = async (id, value) => {
-    const userDoc = doc(db, "UserDataDT", id);
-    // Delete doc from db (update field- didDelete -> true)
-    let deleteUpdate = {
-      didDelete: true,
-    };
-    await updateDoc(userDoc, deleteUpdate);
-    // Delete doc from view
-    const filteredData = UserData.filter((item) => item.id !== value.id);
-    setUserData(filteredData);
-    setBackUpData(filteredData);
-    setGridData(UserData);
+    try {
+      const userDoc = doc(db, "UserDataDT", id);
+      // Delete doc from db (update field- didDelete -> true)
+      let deleteUpdate = {
+        didDelete: true,
+      };
+      await updateDoc(userDoc, deleteUpdate);
+      // Delete doc from view
+      const filteredData = UserData.filter((item) => item.id !== value.id);
+      setUserData(filteredData);
+      setBackUpData(filteredData);
+      setGridData(UserData);
+    } catch (error) {
+      console.log("error", error);
+    }
   };
 
   // This function return true/false: is this row currently in editing mode?
@@ -281,54 +295,58 @@ const UserDataDT = (props) => {
 
   // Custom validation to row (input of edit-from), after user submitted form
   const validateFieldsContent = (row) => {
-    let isValid = true;
-    //Check if input fields are not empty&  valid.
-    if (row.exerciseId.length == 0) {
-      isValid = false;
-      setExerciseIdInvalid(true);
-    } else {
-      setExerciseIdInvalid(false);
-    }
+    try {
+      let isValid = true;
+      //Check if input fields are not empty&  valid.
+      if (row.exerciseId.length == 0) {
+        isValid = false;
+        setExerciseIdInvalid(true);
+      } else {
+        setExerciseIdInvalid(false);
+      }
 
-    if (row.roleId.length == 0) {
-      isValid = false;
-      setRoleIdInvalid(true);
-    } else {
-      if (checkIfRoleExerciseAlreadyExists(row)) {
+      if (row.roleId.length == 0) {
         isValid = false;
         setRoleIdInvalid(true);
       } else {
-        setRoleIdInvalid(false);
+        if (checkIfRoleExerciseAlreadyExists(row)) {
+          isValid = false;
+          setRoleIdInvalid(true);
+        } else {
+          setRoleIdInvalid(false);
+        }
       }
-    }
-    if (row.userName.length == 0) {
-      isValid = false;
-      setUserNameInvalid(true);
-    } else {
-      setUserNameInvalid(false);
-    }
+      if (row.userName.length == 0) {
+        isValid = false;
+        setUserNameInvalid(true);
+      } else {
+        setUserNameInvalid(false);
+      }
 
-    if (row.password.length == 0) {
-      isValid = false;
-      setPasswordInvalid(true);
-    } else {
-      setPasswordInvalid(false);
-    }
+      if (row.password.length == 0) {
+        isValid = false;
+        setPasswordInvalid(true);
+      } else {
+        setPasswordInvalid(false);
+      }
 
-    if (row.canDebrief.length == 0) {
-      isValid = false;
-      setCanDebriefInvalid(true);
-    } else {
-      setCanDebriefInvalid(false);
-    }
+      if (row.canDebrief.length == 0) {
+        isValid = false;
+        setCanDebriefInvalid(true);
+      } else {
+        setCanDebriefInvalid(false);
+      }
 
-    if (row.dsPublishName.length == 0) {
-      isValid = false;
-      setDsPublishNameInvalid(true);
-    } else {
-      setDsPublishNameInvalid(false);
+      if (row.dsPublishName.length == 0) {
+        isValid = false;
+        setDsPublishNameInvalid(true);
+      } else {
+        setDsPublishNameInvalid(false);
+      }
+      return isValid;
+    } catch (error) {
+      console.log("error", error);
     }
-    return isValid;
   };
 
   // If user press save changes after editing- insert new data to DB and update view
@@ -438,7 +456,9 @@ const UserDataDT = (props) => {
             Search
           </Button>
           <Button
-            onClick={() => handleResetCol(clearFilters, selectedKeys, confirm, dataIndex)}
+            onClick={() =>
+              handleResetCol(clearFilters, selectedKeys, confirm, dataIndex)
+            }
             size="small"
             style={{ width: 90 }}
           >
@@ -516,8 +536,8 @@ const UserDataDT = (props) => {
       title: "ת.ז. משתמש",
       dataIndex: "userId",
       align: "center",
-      sorter: (a, b) => a.userId.localeCompare(b.userId),
-      sortOrder: sortedInfo.columnKey === "id" && sortedInfo.order,
+      sorter: (a, b) => a.userId - b.userId,
+      sortOrder: sortedInfo.columnKey === "userId" && sortedInfo.order,
       //...getColumnSearchProps("userId"),
       filters: filtersForUserId,
       filteredValue: filteredInfo.userId || null,
@@ -568,7 +588,7 @@ const UserDataDT = (props) => {
       dataIndex: "password",
       align: "center",
       editTable: true,
-      sorter: (a, b) => new Date(a.password) - new Date(b.password),
+      sorter: (a, b) => a.password.localeCompare(b.password),
       sortOrder: sortedInfo.columnKey === "password" && sortedInfo.order,
       ...getColumnSearchProps("password"),
       filters: filtersForPassword,
@@ -581,8 +601,7 @@ const UserDataDT = (props) => {
       dataIndex: "canDebrief",
       align: "center",
       editTable: true,
-      sorter: (a, b) =>
-        new Date(a.canDebrief.toString()) - new Date(b.canDebrief.toString()),
+      sorter: (a, b) => a.canDebrief.localeCompare(b.canDebrief),
       sortOrder: sortedInfo.columnKey === "canDebrief" && sortedInfo.order,
       // ...getColumnSearchProps("canDebrief"),
       filters: filtersForCanDebrief,
@@ -594,7 +613,7 @@ const UserDataDT = (props) => {
       dataIndex: "dsPublishName",
       align: "center",
       editTable: true,
-      sorter: (a, b) => a.dsPublishName - b.dsPublishName,
+      sorter: (a, b) => a.dsPublishName.localeCompare(b.dsPublishName),
       sortOrder: sortedInfo.columnKey === "dsPublishName" && sortedInfo.order,
       // ...getColumnSearchProps("dsPublishName"),
       filters: filtersForDsPublishName,
@@ -609,51 +628,14 @@ const UserDataDT = (props) => {
       render: (_, record) => {
         const editable = isEditing(record);
         return UserData.length >= 1 ? (
-          <Space>
-            <Popconfirm
-              title="האם אתה בטוח שברצונך למחוק?"
-              onConfirm={() => handleDelete(record)}
-            >
-              {editable ? (
-                ""
-              ) : (
-                <Button
-                  danger
-                  type="primary"
-                  disabled={editable}
-                  icon={<DeleteOutlined />}
-                />
-              )}
-            </Popconfirm>
-            {editable ? (
-              <span>
-                <Space size="medium">
-                  <Popconfirm
-                    title="האם אתה בטוח שברצונך לצאת?"
-                    onConfirm={cancel}
-                  >
-                    <Button icon={<CloseOutlined />} type="primary" danger />
-                  </Popconfirm>
-                  <Button
-                    icon={<SaveOutlined style={{ color: "white" }} />}
-                    onClick={() => save(record.key)}
-                    type="submit"
-                    style={{
-                      marginRight: 8,
-                      background: "green",
-                      borderColor: "green",
-                    }}
-                  />
-                </Space>
-              </span>
-            ) : (
-              <Button
-                onClick={() => edit(record)}
-                type="primary"
-                icon={<EditOutlined />}
-              />
-            )}
-          </Space>
+          <ButtonsInEditColumn
+            handleDelete={handleDelete}
+            record={record}
+            editable={editable}
+            edit={edit}
+            save={save}
+            cancel={cancel}
+          />
         ) : null;
       },
     },
@@ -935,59 +917,21 @@ const UserDataDT = (props) => {
   // Return the main table's JSX
   return (
     <div>
-      <div>
-        {showNewUserForm ? (
-          <NewUser
-            formIsDone={letMeKnowFormIsDone}
-            dataChanged={letMeKnowUserAddedDataToDB}
-            exerciseData={dataForExerciseOptions}
-            roleData={dataForRoleOptions}
-            userData={BackUpData}
-          />
-        ) : (
-          ""
-        )}{" "}
-      </div>
-      <Space style={{ scrollMarginBottom: 16 }}>
-        <Input
-          placeholder="חפש משתמש"
-          onChange={handleInputChange}
-          type="text"
-          style={{
-            border: "none",
-            borderBottom: "1px solid ",
-            marginRight: "20px",
-          }}
-          allowClear
-          value={emptySearchText ? "" : searchedText}
-          suffix={
-            <Button
-              data-testid="globalSearchInputButton" 
-              onClick={globalSearch}
-              type="text"
-              icon={<SearchOutlined />}
-            />
-          }
-        />
-        <Button
-          onClick={reset}
-          icon={<ReloadOutlined />}
-          data-testid="reloadDataButton" 
-          type="text"
-          style={{ marginRight: "20px" }}
-        />
-        {!showNewUserForm ? (
-          <Button
-            onClick={newDataHandle}
-            size="large"
-            data-testid="createNewObjectInDBButton" 
-            style={{ position: "absolute", left: 0, top: 0, color: "#1890ff" }}
-            type="text"
-          >צור משתמש חדש</Button>
-        ) : (
-          ""
-        )}
-      </Space>
+      <AboveTableComponents
+        typeOfNewObject="user"
+        letMeKnowFormIsDone={letMeKnowFormIsDone}
+        letMeKnowUserAddedDataToDB={letMeKnowUserAddedDataToDB}
+        dataForExerciseOptions={dataForExerciseOptions}
+        dataForRoleOptions={dataForRoleOptions}
+        BackUpData={BackUpData}
+        handleInputChange={handleInputChange}
+        emptySearchText={emptySearchText}
+        searchedText={searchedText}
+        globalSearch={globalSearch}
+        reset={reset}
+        showNewObjectForm={showNewUserForm}
+        newDataHandle={newDataHandle}
+      />
       <Form form={form} component={false}>
         <Table
           columns={mergedColumns}
@@ -1009,26 +953,11 @@ const UserDataDT = (props) => {
           tableLayout="fixed"
         />
       </Form>
-      <Button
-        icon={<ExportOutlined />}
-        type="text"
-        size="large"
-        style={{ marginRight: "20px" }}
-      >
-        <CSVLink
-          data={
-            //TrainingData && TrainingData.length ? TrainingData : BackUpData
-            dataToExport && dataToExport.length
-              ? dataToExport
-              : UserData && UserData.length
-              ? UserData
-              : BackUpData
-          }
-          style={{ color: "black" }}
-        >
-          יצא טבלה
-        </CSVLink>
-      </Button>
+      <ExportTableButton
+        dataToExport={dataToExport}
+        DataOfDT={UserData}
+        BackUpData={BackUpData}
+      />
     </div>
   );
 };
